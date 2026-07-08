@@ -1,5 +1,5 @@
 import { binarizeGray, imageDataToGray, otsuThreshold } from './imageUtils'
-import { getPreprocessedCanvas, imageToImageData } from './preprocess'
+import { getPreprocessedCanvas } from './preprocess'
 import { drawCopyImage } from './transform'
 import type { TransformState } from './transform'
 import { DEFAULT_TRANSFORM } from './transform'

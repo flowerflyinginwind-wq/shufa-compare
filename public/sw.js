@@ -1,5 +1,5 @@
 const CACHE_NAME = 'shufa-compare-v1'
-const ASSETS = ['/', '/index.html', '/icon.svg', '/manifest.webmanifest']
+const ASSETS = ['./', './index.html', './icon.svg', './manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

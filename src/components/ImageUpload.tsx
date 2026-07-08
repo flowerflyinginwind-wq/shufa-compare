@@ -95,7 +95,7 @@ export default function ImageUpload({
   )
 
   const handleCameraClick = () => {
-    if (navigator.mediaDevices?.getUserMedia) {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
       setCameraOpen(true)
     } else {
       cameraInputRef.current?.click()

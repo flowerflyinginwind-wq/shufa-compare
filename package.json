@@ -8,7 +8,11 @@
     "dev": "npx vite",
     "dev:mobile": "npx vite --host",
     "build": "tsc -b && npx vite build",
+    "build:github": "tsc -b && npx vite build --base /shufa-compare/",
+    "build:gitee": "tsc -b && npx vite build --base /shufa-compare/",
     "preview": "npx vite preview --host",
+    "preview:github": "npx vite preview --host",
+    "preview:gitee": "npx vite preview --host --base /shufa-compare/",
     "test": "node scripts/run-tests.mjs",
     "test:unit": "vitest run",
     "test:all": "powershell -ExecutionPolicy Bypass -File scripts/auto-test.ps1"

@@ -56,6 +56,12 @@ npm run build
 
 将 `dist` 目录部署到任意静态托管服务即可。部署后可在浏览器中选择「安装应用」添加到主屏幕（需 HTTPS）。
 
+- **GitHub Pages（自动部署）**：[DEPLOY-GITHUB.md](DEPLOY-GITHUB.md)
+- **Gitee Pages（免费国内）**：[DEPLOY-GITEE.md](DEPLOY-GITEE.md)
+- 阿里云 OSS：[DEPLOY-ALIYUN.md](DEPLOY-ALIYUN.md)
+- 其他国内方案：[DEPLOY-CN.md](DEPLOY-CN.md)
+- 境外 / Vercel：[DEPLOY.md](DEPLOY.md)
+
 ## 技术栈
 
 - Vite + React + TypeScript
