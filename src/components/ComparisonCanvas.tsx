@@ -83,6 +83,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
     } | null>(null)
 
     const activePointersRef = useRef(new Map<number, { x: number; y: number }>())
+    const activeTouchesRef = useRef(new Map<number, { x: number; y: number }>())
 
     const pinchRef = useRef<{
       startDistance: number
@@ -223,14 +224,24 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       }
     }, [])
 
-    const beginPinch = useCallback(() => {
-      const pointers = [...activePointersRef.current.values()]
-      if (pointers.length !== 2) return
+    const touchCanvasPos = useCallback(
+      (touch: Touch) => {
+        const pos = canvasDelta(touch.clientX, touch.clientY)
+        return { x: pos.dx, y: pos.dy }
+      },
+      [canvasDelta],
+    )
+
+    const beginPinchFromPoints = useCallback((points: Array<{ x: number; y: number }>) => {
+      if (points.length !== 2) return
 
       dragRef.current = null
-      const [a, b] = pointers
+      const [a, b] = points
+      const startDistance = Math.hypot(b.x - a.x, b.y - a.y)
+      if (startDistance < 8) return
+
       pinchRef.current = {
-        startDistance: Math.hypot(b.x - a.x, b.y - a.y),
+        startDistance,
         startCenterX: (a.x + b.x) / 2,
         startCenterY: (a.y + b.y) / 2,
         baseTransform: { ...transformRef.current },
@@ -238,14 +249,18 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       setIsDragging(true)
     }, [])
 
-    const applyPinch = useCallback(() => {
+    const beginPinch = useCallback(() => {
+      beginPinchFromPoints([...activePointersRef.current.values()])
+    }, [beginPinchFromPoints])
+
+    const applyPinch = useCallback((points?: Array<{ x: number; y: number }>) => {
       const pinch = pinchRef.current
       if (!pinch) return
 
-      const pointers = [...activePointersRef.current.values()]
-      if (pointers.length !== 2) return
+      const gesturePoints = points ?? [...activePointersRef.current.values()]
+      if (gesturePoints.length !== 2) return
 
-      const [a, b] = pointers
+      const [a, b] = gesturePoints
       const distance = Math.hypot(b.x - a.x, b.y - a.y)
       if (pinch.startDistance <= 0) return
 
@@ -277,7 +292,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
     const handlePointerDown = useCallback(
       (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!canInteract) return
+        if (!canInteract || e.pointerType === 'touch') return
         e.preventDefault()
 
         const pos = canvasDelta(e.clientX, e.clientY)
@@ -296,6 +311,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
     const handlePointerMove = useCallback(
       (e: React.PointerEvent<HTMLCanvasElement>) => {
+        if (e.pointerType === 'touch') return
         if (!activePointersRef.current.has(e.pointerId)) return
 
         const pos = canvasDelta(e.clientX, e.clientY)
@@ -378,6 +394,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
     const handlePointerUp = useCallback(
       (e: React.PointerEvent<HTMLCanvasElement>) => {
+        if (e.pointerType === 'touch') return
         if (!activePointersRef.current.has(e.pointerId)) return
 
         activePointersRef.current.delete(e.pointerId)
@@ -403,6 +420,92 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       [beginPinch, beginDrag],
     )
 
+    useEffect(() => {
+      const canvas = canvasRef.current
+      if (!canvas || !canInteract) return
+
+      const syncTouchPositions = (touches: TouchList) => {
+        for (let i = 0; i < touches.length; i += 1) {
+          const touch = touches.item(i)
+          if (!touch) continue
+          activeTouchesRef.current.set(touch.identifier, touchCanvasPos(touch))
+        }
+      }
+
+      const applyTouchGesture = () => {
+        const points = [...activeTouchesRef.current.values()]
+        if (points.length === 2) {
+          if (!pinchRef.current) beginPinchFromPoints(points)
+          else applyPinch(points)
+          return
+        }
+
+        if (points.length === 1) {
+          pinchRef.current = null
+          const [pointerId, point] = [...activeTouchesRef.current.entries()][0]
+          const drag = dragRef.current
+          if (!drag || drag.pointerId !== pointerId) {
+            beginDrag(pointerId, point.x, point.y)
+            return
+          }
+
+          onTransformChange({
+            ...drag.baseTransform,
+            translateX: drag.baseTransform.translateX + (point.x - drag.startX),
+            translateY: drag.baseTransform.translateY + (point.y - drag.startY),
+          })
+        }
+      }
+
+      const onTouchStart = (event: TouchEvent) => {
+        event.preventDefault()
+        syncTouchPositions(event.touches)
+        applyTouchGesture()
+      }
+
+      const onTouchMove = (event: TouchEvent) => {
+        event.preventDefault()
+        syncTouchPositions(event.touches)
+        applyTouchGesture()
+      }
+
+      const onTouchEnd = (event: TouchEvent) => {
+        event.preventDefault()
+        for (let i = 0; i < event.changedTouches.length; i += 1) {
+          const touch = event.changedTouches.item(i)
+          if (touch) activeTouchesRef.current.delete(touch.identifier)
+        }
+
+        if (activeTouchesRef.current.size === 2) {
+          beginPinchFromPoints([...activeTouchesRef.current.values()])
+          return
+        }
+
+        pinchRef.current = null
+
+        if (activeTouchesRef.current.size === 1) {
+          const [pointerId, point] = [...activeTouchesRef.current.entries()][0]
+          beginDrag(pointerId, point.x, point.y)
+          return
+        }
+
+        dragRef.current = null
+        setIsDragging(false)
+      }
+
+      canvas.addEventListener('touchstart', onTouchStart, { passive: false })
+      canvas.addEventListener('touchmove', onTouchMove, { passive: false })
+      canvas.addEventListener('touchend', onTouchEnd, { passive: false })
+      canvas.addEventListener('touchcancel', onTouchEnd, { passive: false })
+
+      return () => {
+        canvas.removeEventListener('touchstart', onTouchStart)
+        canvas.removeEventListener('touchmove', onTouchMove)
+        canvas.removeEventListener('touchend', onTouchEnd)
+        canvas.removeEventListener('touchcancel', onTouchEnd)
+      }
+    }, [canInteract, touchCanvasPos, beginPinchFromPoints, applyPinch, beginDrag, onTransformChange])
+
     const handleWheel = useCallback(
       (e: React.WheelEvent<HTMLCanvasElement>) => {
         if (!canInteract) return
@@ -417,7 +520,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
     return (
       <div
         ref={containerRef}
-        className="relative h-[min(70vh,720px)] min-h-[360px] w-full min-w-0 flex-1 overflow-hidden rounded-lg border border-stone-200 bg-[#faf7f2]"
+        className="relative h-[min(70vh,720px)] min-h-[360px] w-full min-w-0 flex-1 overflow-hidden rounded-lg border border-stone-200 bg-[#faf7f2] touch-none"
       >
         <canvas
           ref={canvasRef}
@@ -430,8 +533,8 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
           }`}
           style={
             displaySize.width > 0
-              ? { width: displaySize.width, height: displaySize.height }
-              : undefined
+              ? { width: displaySize.width, height: displaySize.height, touchAction: 'none' }
+              : { touchAction: 'none' }
           }
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
