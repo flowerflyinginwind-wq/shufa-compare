@@ -9,7 +9,8 @@ import {
 import { renderComparisonFrame, downloadCanvas, renderToCanvas } from '../lib/renderFrame'
 import type { CompareMode, OverlayView } from '../lib/renderFrame'
 import type { DiffMethod } from '../lib/imageDiff'
-import type { TransformState } from '../lib/transform'
+import type { TransformState, ViewportState } from '../lib/transform'
+import { DEFAULT_VIEWPORT } from '../lib/transform'
 
 export interface ComparisonCanvasHandle {
   exportPng: () => void
@@ -29,17 +30,22 @@ interface ComparisonCanvasProps {
   enablePreprocess: boolean
   diffMethod: DiffMethod
   enableMagnifier: boolean
+  fullscreen?: boolean
+  onExitFullscreen?: () => void
 }
 
 function calcDisplaySize(
   containerWidth: number,
   containerHeight: number,
   image: HTMLImageElement,
+  options?: { fill?: boolean; padding?: number },
 ): { width: number; height: number } {
-  const pad = 16
+  const pad = options?.padding ?? 16
   const maxW = Math.max(1, containerWidth - pad * 2)
   const maxH = Math.max(1, containerHeight - pad * 2)
-  const scale = Math.min(maxW / image.width, maxH / image.height)
+  const scale = options?.fill
+    ? Math.max(maxW / image.width, maxH / image.height)
+    : Math.min(maxW / image.width, maxH / image.height)
   return {
     width: Math.max(1, Math.round(image.width * scale)),
     height: Math.max(1, Math.round(image.height * scale)),
@@ -65,12 +71,15 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       enablePreprocess,
       diffMethod,
       enableMagnifier,
+      fullscreen = false,
+      onExitFullscreen,
     },
     ref,
   ) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 })
+    const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT)
     const [isDragging, setIsDragging] = useState(false)
     const [magnifierPos, setMagnifierPos] = useState<{ x: number; y: number } | null>(null)
     const magnifierRef = useRef<HTMLCanvasElement>(null)
@@ -89,11 +98,14 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       startDistance: number
       startCenterX: number
       startCenterY: number
-      baseTransform: TransformState
+      baseViewport: ViewportState
     } | null>(null)
 
     const transformRef = useRef(transform)
     transformRef.current = transform
+
+    const viewportRef = useRef(viewport)
+    viewportRef.current = viewport
 
     const renderParamsRef = useRef({
       mode,
@@ -116,6 +128,10 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
     const canInteract = Boolean(original && copy)
 
+    useEffect(() => {
+      setViewport(DEFAULT_VIEWPORT)
+    }, [original, copy])
+
     useImperativeHandle(ref, () => ({
       getDisplaySize: () => displaySize,
       exportPng: () => {
@@ -126,6 +142,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
           original,
           copy,
           transform: transformRef.current,
+          viewport: viewportRef.current,
           mode,
           overlayView,
           opacity,
@@ -151,14 +168,19 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
           setDisplaySize({ width: Math.round(width), height: Math.round(height) })
           return
         }
-        setDisplaySize(calcDisplaySize(width, height, original))
+        setDisplaySize(
+          calcDisplaySize(width, height, original, {
+            fill: fullscreen,
+            padding: fullscreen ? 0 : 8,
+          }),
+        )
       }
 
       updateSize()
       const observer = new ResizeObserver(updateSize)
       observer.observe(container)
       return () => observer.disconnect()
-    }, [original])
+    }, [original, fullscreen])
 
     useEffect(() => {
       const canvas = canvasRef.current
@@ -188,6 +210,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
         original,
         copy,
         transform,
+        viewport,
         mode,
         overlayView,
         opacity,
@@ -202,6 +225,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       original,
       copy,
       transform,
+      viewport,
       mode,
       overlayView,
       opacity,
@@ -244,7 +268,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
         startDistance,
         startCenterX: (a.x + b.x) / 2,
         startCenterY: (a.y + b.y) / 2,
-        baseTransform: { ...transformRef.current },
+        baseViewport: { ...viewportRef.current },
       }
       setIsDragging(true)
     }, [])
@@ -268,13 +292,13 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       const centerY = (a.y + b.y) / 2
       const scaleRatio = distance / pinch.startDistance
 
-      onTransformChange({
-        ...pinch.baseTransform,
-        translateX: pinch.baseTransform.translateX + (centerX - pinch.startCenterX),
-        translateY: pinch.baseTransform.translateY + (centerY - pinch.startCenterY),
-        scale: clamp(pinch.baseTransform.scale * scaleRatio, 0.5, 2),
+      setViewport({
+        ...pinch.baseViewport,
+        translateX: pinch.baseViewport.translateX + (centerX - pinch.startCenterX),
+        translateY: pinch.baseViewport.translateY + (centerY - pinch.startCenterY),
+        scale: clamp(pinch.baseViewport.scale * scaleRatio, 0.5, 4),
       })
-    }, [onTransformChange])
+    }, [])
 
     const beginDrag = useCallback(
       (pointerId: number, x: number, y: number) => {
@@ -510,21 +534,51 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       (e: React.WheelEvent<HTMLCanvasElement>) => {
         if (!canInteract) return
         e.preventDefault()
-        const delta = e.deltaY > 0 ? -0.02 : 0.02
-        const nextScale = clamp(transformRef.current.scale + delta, 0.5, 2)
-        onTransformChange({ ...transformRef.current, scale: nextScale })
+        const delta = e.deltaY > 0 ? -0.05 : 0.05
+        const nextScale = clamp(viewportRef.current.scale + delta, 0.5, 4)
+        setViewport({ ...viewportRef.current, scale: nextScale })
       },
-      [canInteract, onTransformChange],
+      [canInteract],
     )
+
+    const resetViewport = useCallback(() => {
+      setViewport(DEFAULT_VIEWPORT)
+    }, [])
 
     return (
       <div
         ref={containerRef}
-        className="relative h-[min(70vh,720px)] min-h-[360px] w-full min-w-0 flex-1 overflow-hidden rounded-lg border border-stone-200 bg-[#faf7f2] touch-none"
+        className={`relative w-full min-w-0 flex-1 overflow-hidden touch-none bg-[#faf7f2] ${
+          fullscreen
+            ? 'h-full min-h-0 rounded-none border-0'
+            : 'h-[min(70vh,720px)] min-h-[280px] rounded-lg border border-stone-200 max-md:h-[calc(100dvh-11rem)] max-md:min-h-[320px]'
+        }`}
       >
+        {fullscreen && onExitFullscreen && (
+          <button
+            type="button"
+            onClick={onExitFullscreen}
+            className="absolute left-3 top-3 z-10 rounded-full bg-black/55 px-3 py-1.5 text-xs text-white"
+          >
+            返回设置
+          </button>
+        )}
+
+        {canInteract && fullscreen && (
+          <button
+            type="button"
+            onClick={resetViewport}
+            className="absolute right-3 top-3 z-10 rounded-full bg-black/55 px-3 py-1.5 text-xs text-white"
+          >
+            重置缩放
+          </button>
+        )}
+
         <canvas
           ref={canvasRef}
-          className={`absolute left-1/2 top-1/2 max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 touch-none shadow-sm ${
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 touch-none shadow-sm ${
+            fullscreen ? '' : 'max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)]'
+          } ${
             canInteract
               ? isDragging
                 ? 'cursor-grabbing'
@@ -558,8 +612,8 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
         )}
 
         {canInteract && (
-          <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
-            拖拽移动 · 双指缩放 · 滚轮缩放
+          <p className="pointer-events-none absolute bottom-3 left-1/2 z-10 max-w-[92%] -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-center text-xs text-white">
+            单指拖临摹 · 双指缩放整体
             {enableMagnifier ? ' · 悬停放大' : ''}
             {showGuides ? ' · 辅助线' : ''}
           </p>

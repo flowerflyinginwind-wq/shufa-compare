@@ -5,8 +5,8 @@ import {
   type DiffMethod,
 } from './imageDiff'
 import { getPreprocessedCanvas } from './preprocess'
-import { drawCopyImage, renderCopyToCanvas } from './transform'
-import type { TransformState } from './transform'
+import { applyViewportTransform, drawCopyImage, renderCopyToCanvas } from './transform'
+import type { TransformState, ViewportState } from './transform'
 
 export type CompareMode = 'overlay' | 'diff'
 export type OverlayView = 'overlay' | 'original' | 'copy'
@@ -15,6 +15,7 @@ export interface RenderOptions {
   original: HTMLImageElement
   copy: HTMLImageElement
   transform: TransformState
+  viewport?: ViewportState
   mode: CompareMode
   overlayView: OverlayView
   opacity: number
@@ -74,6 +75,7 @@ export function renderComparisonFrame(
     original,
     copy,
     transform,
+    viewport,
     mode,
     overlayView,
     opacity,
@@ -90,6 +92,11 @@ export function renderComparisonFrame(
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, width, height)
 
+  ctx.save()
+  if (viewport) {
+    applyViewportTransform(ctx, viewport, width, height)
+  }
+
   if (mode === 'overlay') {
     if (overlayView === 'original' || overlayView === 'overlay') {
       ctx.drawImage(orig, 0, 0, width, height)
@@ -101,6 +108,7 @@ export function renderComparisonFrame(
     if (showGuides && overlayView === 'overlay') {
       drawAlignmentGuides(ctx, width, height)
     }
+    ctx.restore()
     return
   }
 
@@ -126,6 +134,8 @@ export function renderComparisonFrame(
   if (showGuides) {
     drawAlignmentGuides(ctx, width, height)
   }
+
+  ctx.restore()
 
   void original
   void copy

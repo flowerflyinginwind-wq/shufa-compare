@@ -5,11 +5,41 @@ export interface TransformState {
   rotation: number
 }
 
+export interface ViewportState {
+  scale: number
+  translateX: number
+  translateY: number
+}
+
 export const DEFAULT_TRANSFORM: TransformState = {
   translateX: 0,
   translateY: 0,
   scale: 1,
   rotation: 0,
+}
+
+export const DEFAULT_VIEWPORT: ViewportState = {
+  scale: 1,
+  translateX: 0,
+  translateY: 0,
+}
+
+/**
+ * 视图变换：同时缩放/平移原稿与临摹层。
+ */
+export function applyViewportTransform(
+  ctx: CanvasRenderingContext2D,
+  viewport: ViewportState,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  const centerX = canvasWidth / 2
+  const centerY = canvasHeight / 2
+
+  ctx.translate(viewport.translateX, viewport.translateY)
+  ctx.translate(centerX, centerY)
+  ctx.scale(viewport.scale, viewport.scale)
+  ctx.translate(-centerX, -centerY)
 }
 
 /**

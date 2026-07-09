@@ -32,6 +32,8 @@ export default function App() {
   const [diffMethod, setDiffMethod] = useState<DiffMethod>(initial.diffMethod)
   const [enableMagnifier, setEnableMagnifier] = useState(initial.enableMagnifier)
   const [autoAligning, setAutoAligning] = useState(false)
+  const [mobileFocus, setMobileFocus] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   const ready = Boolean(original && copy)
 
@@ -56,6 +58,23 @@ export default function App() {
       window.removeEventListener('drop', prevent)
     }
   }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (ready && isMobile) {
+      setMobileFocus(true)
+    }
+    if (!ready) {
+      setMobileFocus(false)
+    }
+  }, [ready, isMobile])
 
   useEffect(() => {
     saveSettings(currentSettings)
@@ -126,13 +145,36 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-stone-300 bg-white/80 px-6 py-4 backdrop-blur">
-        <h1 className="text-xl font-semibold text-stone-900">书法临摹对比</h1>
-        <p className="mt-1 text-sm text-stone-600">
-          拍照上传 · 放大镜 · 历史记录 · 可安装离线使用
-        </p>
-      </header>
+      {!mobileFocus && (
+        <header className="border-b border-stone-300 bg-white/80 px-6 py-4 backdrop-blur">
+          <h1 className="text-xl font-semibold text-stone-900">书法临摹对比</h1>
+          <p className="mt-1 text-sm text-stone-600">
+            拍照上传 · 放大镜 · 历史记录 · 可安装离线使用
+          </p>
+        </header>
+      )}
 
+      {mobileFocus ? (
+        <div className="fixed inset-0 z-50 flex flex-col bg-[#faf7f2]">
+          <ComparisonCanvas
+            ref={canvasRef}
+            original={original}
+            copy={copy}
+            transform={transform}
+            onTransformChange={setTransform}
+            mode={mode}
+            overlayView={overlayView}
+            opacity={opacity}
+            diffThreshold={diffThreshold}
+            showGuides={showGuides}
+            enablePreprocess={enablePreprocess}
+            diffMethod={diffMethod}
+            enableMagnifier={enableMagnifier}
+            fullscreen
+            onExitFullscreen={() => setMobileFocus(false)}
+          />
+        </div>
+      ) : (
       <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4 lg:min-h-0 lg:flex-row lg:items-start lg:p-6">
         <aside className="w-full shrink-0 space-y-4 lg:w-80 lg:shrink-0">
           <ImageUpload
@@ -175,6 +217,16 @@ export default function App() {
             onToggleMagnifier={() => setEnableMagnifier((v) => !v)}
           />
 
+          {ready && isMobile && (
+            <button
+              type="button"
+              onClick={() => setMobileFocus(true)}
+              className="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900"
+            >
+              全屏对比
+            </button>
+          )}
+
           <TransformControls
             transform={transform}
             onChange={setTransform}
@@ -209,6 +261,7 @@ export default function App() {
           enableMagnifier={enableMagnifier}
         />
       </main>
+      )}
     </div>
   )
 }

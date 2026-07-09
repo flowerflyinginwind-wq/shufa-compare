@@ -73,7 +73,7 @@ export default function TransformControls({
       </div>
 
       <p className="text-xs text-stone-500">
-        可在右侧画布直接拖拽移动、滚轮缩放；滑块用于精细调节
+        单指拖动画布可移动临摹层；双指捏合同时放大原稿与临摹。滑块用于精细调节临摹对齐。
       </p>
 
       <SliderRow
@@ -97,7 +97,7 @@ export default function TransformControls({
         onChange={(translateY) => update({ translateY })}
       />
       <SliderRow
-        label="缩放"
+        label="临摹缩放"
         value={transform.scale}
         min={0.5}
         max={2}
