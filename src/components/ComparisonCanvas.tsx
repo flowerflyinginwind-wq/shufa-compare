@@ -82,6 +82,15 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       baseTransform: TransformState
     } | null>(null)
 
+    const activePointersRef = useRef(new Map<number, { x: number; y: number }>())
+
+    const pinchRef = useRef<{
+      startDistance: number
+      startCenterX: number
+      startCenterY: number
+      baseTransform: TransformState
+    } | null>(null)
+
     const transformRef = useRef(transform)
     transformRef.current = transform
 
@@ -214,25 +223,90 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       }
     }, [])
 
+    const beginPinch = useCallback(() => {
+      const pointers = [...activePointersRef.current.values()]
+      if (pointers.length !== 2) return
+
+      dragRef.current = null
+      const [a, b] = pointers
+      pinchRef.current = {
+        startDistance: Math.hypot(b.x - a.x, b.y - a.y),
+        startCenterX: (a.x + b.x) / 2,
+        startCenterY: (a.y + b.y) / 2,
+        baseTransform: { ...transformRef.current },
+      }
+      setIsDragging(true)
+    }, [])
+
+    const applyPinch = useCallback(() => {
+      const pinch = pinchRef.current
+      if (!pinch) return
+
+      const pointers = [...activePointersRef.current.values()]
+      if (pointers.length !== 2) return
+
+      const [a, b] = pointers
+      const distance = Math.hypot(b.x - a.x, b.y - a.y)
+      if (pinch.startDistance <= 0) return
+
+      const centerX = (a.x + b.x) / 2
+      const centerY = (a.y + b.y) / 2
+      const scaleRatio = distance / pinch.startDistance
+
+      onTransformChange({
+        ...pinch.baseTransform,
+        translateX: pinch.baseTransform.translateX + (centerX - pinch.startCenterX),
+        translateY: pinch.baseTransform.translateY + (centerY - pinch.startCenterY),
+        scale: clamp(pinch.baseTransform.scale * scaleRatio, 0.5, 2),
+      })
+    }, [onTransformChange])
+
+    const beginDrag = useCallback(
+      (pointerId: number, x: number, y: number) => {
+        pinchRef.current = null
+        dragRef.current = {
+          pointerId,
+          startX: x,
+          startY: y,
+          baseTransform: { ...transformRef.current },
+        }
+        setIsDragging(true)
+      },
+      [],
+    )
+
     const handlePointerDown = useCallback(
       (e: React.PointerEvent<HTMLCanvasElement>) => {
         if (!canInteract) return
         e.preventDefault()
+
         const pos = canvasDelta(e.clientX, e.clientY)
-        dragRef.current = {
-          pointerId: e.pointerId,
-          startX: pos.dx,
-          startY: pos.dy,
-          baseTransform: { ...transformRef.current },
+        activePointersRef.current.set(e.pointerId, { x: pos.dx, y: pos.dy })
+
+        if (activePointersRef.current.size === 2) {
+          beginPinch()
+        } else if (activePointersRef.current.size === 1) {
+          beginDrag(e.pointerId, pos.dx, pos.dy)
         }
-        setIsDragging(true)
+
         e.currentTarget.setPointerCapture(e.pointerId)
       },
-      [canInteract, canvasDelta],
+      [canInteract, canvasDelta, beginPinch, beginDrag],
     )
 
     const handlePointerMove = useCallback(
       (e: React.PointerEvent<HTMLCanvasElement>) => {
+        if (!activePointersRef.current.has(e.pointerId)) return
+
+        const pos = canvasDelta(e.clientX, e.clientY)
+        activePointersRef.current.set(e.pointerId, { x: pos.dx, y: pos.dy })
+
+        if (activePointersRef.current.size === 2) {
+          if (!pinchRef.current) beginPinch()
+          applyPinch()
+          return
+        }
+
         if (enableMagnifier && canInteract && !dragRef.current) {
           setMagnifierPos({ x: e.clientX, y: e.clientY })
         }
@@ -240,7 +314,6 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
         const drag = dragRef.current
         if (!drag || drag.pointerId !== e.pointerId) return
 
-        const pos = canvasDelta(e.clientX, e.clientY)
         const dx = pos.dx - drag.startX
         const dy = pos.dy - drag.startY
 
@@ -250,7 +323,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
           translateY: drag.baseTransform.translateY + dy,
         })
       },
-      [canvasDelta, onTransformChange, enableMagnifier, canInteract],
+      [canvasDelta, onTransformChange, enableMagnifier, canInteract, beginPinch, applyPinch],
     )
 
     const handlePointerLeave = useCallback(() => {
@@ -305,13 +378,29 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
     const handlePointerUp = useCallback(
       (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return
+        if (!activePointersRef.current.has(e.pointerId)) return
+
+        activePointersRef.current.delete(e.pointerId)
+        e.currentTarget.releasePointerCapture(e.pointerId)
+
+        if (activePointersRef.current.size === 2) {
+          beginPinch()
+          return
+        }
+
+        pinchRef.current = null
+
+        if (activePointersRef.current.size === 1) {
+          const [pointerId, point] = [...activePointersRef.current.entries()][0]
+          beginDrag(pointerId, point.x, point.y)
+          return
+        }
+
         dragRef.current = null
         setIsDragging(false)
         setMagnifierPos(null)
-        e.currentTarget.releasePointerCapture(e.pointerId)
       },
-      [],
+      [beginPinch, beginDrag],
     )
 
     const handleWheel = useCallback(
@@ -367,7 +456,7 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
         {canInteract && (
           <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
-            拖拽移动 · 滚轮缩放
+            拖拽移动 · 双指缩放 · 滚轮缩放
             {enableMagnifier ? ' · 悬停放大' : ''}
             {showGuides ? ' · 辅助线' : ''}
           </p>
