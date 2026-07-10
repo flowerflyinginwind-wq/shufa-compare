@@ -12,6 +12,8 @@ import type { DiffMethod } from '../lib/imageDiff'
 import type { TransformState, ViewportState } from '../lib/transform'
 import { DEFAULT_VIEWPORT } from '../lib/transform'
 
+const FULLSCREEN_VIEWPORT = { scale: 1.35, translateX: 0, translateY: 0 }
+
 export interface ComparisonCanvasHandle {
   exportPng: () => void
   getDisplaySize: () => { width: number; height: number }
@@ -129,8 +131,8 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
     const canInteract = Boolean(original && copy)
 
     useEffect(() => {
-      setViewport(DEFAULT_VIEWPORT)
-    }, [original, copy])
+      setViewport(fullscreen ? FULLSCREEN_VIEWPORT : DEFAULT_VIEWPORT)
+    }, [original, copy, fullscreen])
 
     useImperativeHandle(ref, () => ({
       getDisplaySize: () => displaySize,
@@ -542,16 +544,16 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
     )
 
     const resetViewport = useCallback(() => {
-      setViewport(DEFAULT_VIEWPORT)
-    }, [])
+      setViewport(fullscreen ? FULLSCREEN_VIEWPORT : DEFAULT_VIEWPORT)
+    }, [fullscreen])
 
     return (
       <div
         ref={containerRef}
-        className={`relative w-full min-w-0 flex-1 overflow-hidden touch-none bg-[#faf7f2] ${
+        className={`relative w-full min-w-0 overflow-hidden touch-none bg-[#faf7f2] ${
           fullscreen
-            ? 'h-full min-h-0 rounded-none border-0'
-            : 'h-[min(70vh,720px)] min-h-[280px] rounded-lg border border-stone-200 max-md:h-[calc(100dvh-11rem)] max-md:min-h-[320px]'
+            ? 'min-h-0 flex-1 rounded-none border-0'
+            : 'h-[min(70vh,720px)] min-h-[280px] flex-1 rounded-lg border border-stone-200 max-md:h-[calc(100dvh-11rem)] max-md:min-h-[320px]'
         }`}
       >
         {fullscreen && onExitFullscreen && (
@@ -609,6 +611,12 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
               top: magnifierPos.y - 160,
             }}
           />
+        )}
+
+        {canInteract && fullscreen && (
+          <p className="pointer-events-none absolute left-3 top-12 z-10 rounded-full bg-black/45 px-2 py-1 text-[10px] text-white">
+            默认已放大 · 双指可继续缩放
+          </p>
         )}
 
         {canInteract && (

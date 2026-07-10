@@ -2,6 +2,16 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 
+function readAppVersion() {
+  try {
+    const source = fs.readFileSync(path.resolve('src/lib/appVersion.ts'), 'utf8')
+    const match = source.match(/APP_VERSION = '([^']+)'/)
+    return match?.[1] ?? 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
 function normalizeBase(base) {
   if (!base || base === '/') return ''
   return base.endsWith('/') ? base.slice(0, -1) : base
@@ -42,8 +52,9 @@ if (!fs.existsSync(indexPath)) {
 
 const distFiles = collectFiles(distDir)
 const precache = [...new Set(distFiles.map((file) => toUrlPath(base, file)))].sort()
+const appVersion = readAppVersion()
 const cacheKey = crypto.createHash('md5').update(precache.join('|')).digest('hex').slice(0, 10)
-const cacheName = `shufa-compare-${cacheKey}`
+const cacheName = `shufa-compare-${appVersion}-${cacheKey}`
 const indexUrl = toUrlPath(base, 'index.html')
 const scopePrefix = normalizeBase(base) || '/'
 

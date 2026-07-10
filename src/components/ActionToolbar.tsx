@@ -64,7 +64,7 @@ export default function ActionToolbar({
       </label>
 
       <p className="text-xs text-stone-500">
-        拖拽对齐临摹 · 开启放大镜后移动鼠标细看笔画
+        手机点「全屏对比」后，双指捏合可同时放大原帖与临摹
       </p>
     </div>
   )

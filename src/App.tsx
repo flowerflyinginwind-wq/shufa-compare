@@ -15,6 +15,8 @@ import { loadImageFromDataUrl } from './lib/imageLoad'
 import { loadSettings, saveSettings } from './lib/settings'
 import { DEFAULT_TRANSFORM } from './lib/transform'
 import type { TransformState } from './lib/transform'
+import { APP_VERSION } from './lib/appVersion'
+import { isTouchDevice } from './lib/device'
 
 export default function App() {
   const initial = loadSettings()
@@ -60,11 +62,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 768px)')
-    const update = () => setIsMobile(media.matches)
+    const update = () => setIsMobile(isTouchDevice())
     update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
   }, [])
 
   useEffect(() => {
@@ -149,13 +150,13 @@ export default function App() {
         <header className="border-b border-stone-300 bg-white/80 px-6 py-4 backdrop-blur">
           <h1 className="text-xl font-semibold text-stone-900">书法临摹对比</h1>
           <p className="mt-1 text-sm text-stone-600">
-            拍照上传 · 放大镜 · 历史记录 · 可安装离线使用
+            拍照上传 · 全屏对比 · 双指缩放 · v{APP_VERSION}
           </p>
         </header>
       )}
 
       {mobileFocus ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-[#faf7f2]">
+        <div className="fixed inset-0 z-50 flex h-dvh w-full flex-col bg-[#faf7f2]">
           <ComparisonCanvas
             ref={canvasRef}
             original={original}
@@ -261,6 +262,16 @@ export default function App() {
           enableMagnifier={enableMagnifier}
         />
       </main>
+      )}
+
+      {ready && isMobile && !mobileFocus && (
+        <button
+          type="button"
+          onClick={() => setMobileFocus(true)}
+          className="fixed bottom-5 right-4 z-40 rounded-full bg-amber-800 px-5 py-3 text-sm font-medium text-white shadow-lg"
+        >
+          全屏对比
+        </button>
       )}
     </div>
   )
