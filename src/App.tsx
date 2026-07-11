@@ -151,7 +151,7 @@ export default function App() {
     <div className="min-h-screen">
       {!mobileFocus && (
         <header className="border-b border-stone-300 bg-white/80 px-6 py-4 backdrop-blur">
-          <h1 className="text-xl font-semibold text-stone-900">书法临摹对比</h1>
+          <h1 className="text-xl font-semibold text-stone-900">书画临摹对比</h1>
           <p className="mt-1 text-sm text-stone-600">
             拍照上传 · 全屏对比 · 双指缩放 · v{APP_VERSION}
           </p>

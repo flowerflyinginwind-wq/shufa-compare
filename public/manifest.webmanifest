@@ -1,7 +1,7 @@
 {
-  "name": "书法临摹对比",
+  "name": "书画临摹对比",
   "short_name": "临摹对比",
-  "description": "书法原帖与临摹作品对比工具",
+  "description": "书画原帖与临摹作品对比工具",
   "start_url": "/shufa-compare/",
   "scope": "/shufa-compare/",
   "display": "standalone",

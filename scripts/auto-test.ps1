@@ -23,7 +23,7 @@ function Test-Step($name, $action) {
     }
 }
 
-Log "=== 书法临摹对比 自动测试 ==="
+Log "=== 书画临摹对比 自动测试 ==="
 $ok = $true
 
 $ok = (Test-Step "依赖检查" {
@@ -50,7 +50,7 @@ $ok = (Test-Step "预览页面检查" {
     Start-Sleep -Seconds 4
     try {
         $html = (Invoke-WebRequest -Uri "http://localhost:4173" -UseBasicParsing -TimeoutSec 8).Content
-        if ($html -notmatch "书法临摹对比") { throw "title not found" }
+        if ($html -notmatch "书画临摹对比") { throw "title not found" }
     } finally {
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     }

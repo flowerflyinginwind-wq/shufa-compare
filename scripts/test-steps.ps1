@@ -1,4 +1,4 @@
-# 分步测试脚本 - 书法临摹对比工具
+# 分步测试脚本 - 书画临摹对比工具
 # 用法: powershell -ExecutionPolicy Bypass -File scripts\test-steps.ps1
 
 $ErrorActionPreference = "Stop"
@@ -71,7 +71,7 @@ $allOk = (Step 6 "预览页面内容检查" {
     Start-Sleep -Seconds 3
     try {
         $html = (Invoke-WebRequest -Uri "http://localhost:4173" -UseBasicParsing -TimeoutSec 5).Content
-        if ($html -notmatch "书法临摹对比") { throw "页面未包含标题「书法临摹对比」" }
+        if ($html -notmatch "书画临摹对比") { throw "页面未包含标题「书画临摹对比」" }
         Write-Host "  页面标题检查通过"
     } finally {
         Stop-Job $job -ErrorAction SilentlyContinue
