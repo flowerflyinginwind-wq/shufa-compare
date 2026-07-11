@@ -5,8 +5,11 @@ import type { CompareMode, OverlayView } from '../components/ModeToolbar'
 
 const STORAGE_KEY = 'shufa-compare-settings'
 
+export type ZoomMode = 'viewport' | 'copy'
+
 export interface AppSettings {
   transform: TransformState
+  zoomMode: ZoomMode
   mode: CompareMode
   overlayView: OverlayView
   opacity: number
@@ -19,6 +22,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   transform: DEFAULT_TRANSFORM,
+  zoomMode: 'viewport',
   mode: 'overlay',
   overlayView: 'overlay',
   opacity: 50,

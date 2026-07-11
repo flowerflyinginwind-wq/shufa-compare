@@ -12,7 +12,7 @@ import type { HistoryRecord } from './lib/history'
 import { saveHistoryRecord } from './lib/history'
 import type { DiffMethod } from './lib/imageDiff'
 import { loadImageFromDataUrl } from './lib/imageLoad'
-import { loadSettings, saveSettings } from './lib/settings'
+import { loadSettings, saveSettings, type ZoomMode } from './lib/settings'
 import { DEFAULT_TRANSFORM } from './lib/transform'
 import type { TransformState } from './lib/transform'
 import { APP_VERSION } from './lib/appVersion'
@@ -25,6 +25,7 @@ export default function App() {
   const [original, setOriginal] = useState<HTMLImageElement | null>(null)
   const [copy, setCopy] = useState<HTMLImageElement | null>(null)
   const [transform, setTransform] = useState<TransformState>(initial.transform)
+  const [zoomMode, setZoomMode] = useState<ZoomMode>(initial.zoomMode ?? 'viewport')
   const [mode, setMode] = useState<CompareMode>(initial.mode)
   const [overlayView, setOverlayView] = useState<OverlayView>(initial.overlayView)
   const [opacity, setOpacity] = useState(initial.opacity)
@@ -41,6 +42,7 @@ export default function App() {
 
   const currentSettings = {
     transform,
+    zoomMode,
     mode,
     overlayView,
     opacity,
@@ -79,7 +81,7 @@ export default function App() {
 
   useEffect(() => {
     saveSettings(currentSettings)
-  }, [transform, mode, overlayView, opacity, diffThreshold, showGuides, enablePreprocess, diffMethod, enableMagnifier])
+  }, [transform, zoomMode, mode, overlayView, opacity, diffThreshold, showGuides, enablePreprocess, diffMethod, enableMagnifier])
 
   const handleAutoAlign = () => {
     if (!original || !copy) return
@@ -131,6 +133,7 @@ export default function App() {
       setOriginal(orig)
       setCopy(cop)
       setTransform(record.settings.transform)
+      setZoomMode(record.settings.zoomMode ?? 'viewport')
       setMode(record.settings.mode)
       setOverlayView(record.settings.overlayView)
       setOpacity(record.settings.opacity)
@@ -171,6 +174,8 @@ export default function App() {
             enablePreprocess={enablePreprocess}
             diffMethod={diffMethod}
             enableMagnifier={enableMagnifier}
+            zoomMode={zoomMode}
+            onZoomModeChange={setZoomMode}
             fullscreen
             onExitFullscreen={() => setMobileFocus(false)}
           />
@@ -231,6 +236,8 @@ export default function App() {
           <TransformControls
             transform={transform}
             onChange={setTransform}
+            zoomMode={zoomMode}
+            onZoomModeChange={setZoomMode}
             disabled={!ready}
           />
           <ModeToolbar
@@ -260,6 +267,8 @@ export default function App() {
           enablePreprocess={enablePreprocess}
           diffMethod={diffMethod}
           enableMagnifier={enableMagnifier}
+          zoomMode={zoomMode}
+          onZoomModeChange={setZoomMode}
         />
       </main>
       )}

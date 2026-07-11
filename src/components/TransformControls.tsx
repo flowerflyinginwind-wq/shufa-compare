@@ -1,9 +1,12 @@
 import type { TransformState } from '../lib/transform'
 import { DEFAULT_TRANSFORM } from '../lib/transform'
+import type { ZoomMode } from '../lib/settings'
 
 interface TransformControlsProps {
   transform: TransformState
   onChange: (transform: TransformState) => void
+  zoomMode: ZoomMode
+  onZoomModeChange: (mode: ZoomMode) => void
   disabled?: boolean
 }
 
@@ -52,6 +55,8 @@ function SliderRow({
 export default function TransformControls({
   transform,
   onChange,
+  zoomMode,
+  onZoomModeChange,
   disabled,
 }: TransformControlsProps) {
   const update = (patch: Partial<TransformState>) => {
@@ -73,8 +78,35 @@ export default function TransformControls({
       </div>
 
       <p className="text-xs text-stone-500">
-        单指拖动画布可移动临摹层；双指捏合同时放大原稿与临摹。滑块用于精细调节临摹对齐。
+        单指拖动画布可移动临摹层。双指捏合缩放时，可选择整体缩放或仅缩放临摹层。
       </p>
+
+      <div className="flex overflow-hidden rounded-lg border border-stone-200 text-xs">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onZoomModeChange('viewport')}
+          className={`flex-1 px-3 py-2 transition-colors ${
+            zoomMode === 'viewport'
+              ? 'bg-amber-100 font-medium text-amber-900'
+              : 'bg-white text-stone-600 hover:bg-stone-50'
+          } disabled:opacity-40`}
+        >
+          整体缩放
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onZoomModeChange('copy')}
+          className={`flex-1 border-l border-stone-200 px-3 py-2 transition-colors ${
+            zoomMode === 'copy'
+              ? 'bg-amber-100 font-medium text-amber-900'
+              : 'bg-white text-stone-600 hover:bg-stone-50'
+          } disabled:opacity-40`}
+        >
+          临摹缩放
+        </button>
+      </div>
 
       <SliderRow
         label="水平平移"

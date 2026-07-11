@@ -11,6 +11,7 @@ import type { CompareMode, OverlayView } from '../lib/renderFrame'
 import type { DiffMethod } from '../lib/imageDiff'
 import type { TransformState, ViewportState } from '../lib/transform'
 import { DEFAULT_VIEWPORT } from '../lib/transform'
+import type { ZoomMode } from '../lib/settings'
 
 const FULLSCREEN_VIEWPORT = { scale: 1.35, translateX: 0, translateY: 0 }
 
@@ -32,6 +33,8 @@ interface ComparisonCanvasProps {
   enablePreprocess: boolean
   diffMethod: DiffMethod
   enableMagnifier: boolean
+  zoomMode: ZoomMode
+  onZoomModeChange?: (mode: ZoomMode) => void
   fullscreen?: boolean
   onExitFullscreen?: () => void
 }
@@ -73,6 +76,8 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       enablePreprocess,
       diffMethod,
       enableMagnifier,
+      zoomMode,
+      onZoomModeChange,
       fullscreen = false,
       onExitFullscreen,
     },
@@ -100,7 +105,9 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       startDistance: number
       startCenterX: number
       startCenterY: number
+      mode: ZoomMode
       baseViewport: ViewportState
+      baseTransform: TransformState
     } | null>(null)
 
     const transformRef = useRef(transform)
@@ -108,6 +115,9 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
     const viewportRef = useRef(viewport)
     viewportRef.current = viewport
+
+    const zoomModeRef = useRef(zoomMode)
+    zoomModeRef.current = zoomMode
 
     const renderParamsRef = useRef({
       mode,
@@ -270,7 +280,9 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
         startDistance,
         startCenterX: (a.x + b.x) / 2,
         startCenterY: (a.y + b.y) / 2,
+        mode: zoomModeRef.current,
         baseViewport: { ...viewportRef.current },
+        baseTransform: { ...transformRef.current },
       }
       setIsDragging(true)
     }, [])
@@ -294,13 +306,23 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
       const centerY = (a.y + b.y) / 2
       const scaleRatio = distance / pinch.startDistance
 
+      if (pinch.mode === 'copy') {
+        onTransformChange({
+          ...pinch.baseTransform,
+          translateX: pinch.baseTransform.translateX + (centerX - pinch.startCenterX),
+          translateY: pinch.baseTransform.translateY + (centerY - pinch.startCenterY),
+          scale: clamp(pinch.baseTransform.scale * scaleRatio, 0.5, 4),
+        })
+        return
+      }
+
       setViewport({
         ...pinch.baseViewport,
         translateX: pinch.baseViewport.translateX + (centerX - pinch.startCenterX),
         translateY: pinch.baseViewport.translateY + (centerY - pinch.startCenterY),
         scale: clamp(pinch.baseViewport.scale * scaleRatio, 0.5, 4),
       })
-    }, [])
+    }, [onTransformChange])
 
     const beginDrag = useCallback(
       (pointerId: number, x: number, y: number) => {
@@ -537,15 +559,29 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
         if (!canInteract) return
         e.preventDefault()
         const delta = e.deltaY > 0 ? -0.05 : 0.05
+
+        if (zoomModeRef.current === 'copy') {
+          const current = transformRef.current
+          onTransformChange({
+            ...current,
+            scale: clamp(current.scale + delta, 0.5, 4),
+          })
+          return
+        }
+
         const nextScale = clamp(viewportRef.current.scale + delta, 0.5, 4)
         setViewport({ ...viewportRef.current, scale: nextScale })
       },
-      [canInteract],
+      [canInteract, onTransformChange],
     )
 
-    const resetViewport = useCallback(() => {
+    const resetZoom = useCallback(() => {
+      if (zoomModeRef.current === 'copy') {
+        onTransformChange({ ...transformRef.current, scale: 1 })
+        return
+      }
       setViewport(fullscreen ? FULLSCREEN_VIEWPORT : DEFAULT_VIEWPORT)
-    }, [fullscreen])
+    }, [fullscreen, onTransformChange])
 
     return (
       <div
@@ -567,13 +603,33 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
         )}
 
         {canInteract && fullscreen && (
-          <button
-            type="button"
-            onClick={resetViewport}
-            className="absolute right-3 top-3 z-10 rounded-full bg-black/55 px-3 py-1.5 text-xs text-white"
-          >
-            重置缩放
-          </button>
+          <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+            {onZoomModeChange && (
+              <div className="flex overflow-hidden rounded-full bg-black/55 text-[10px] text-white">
+                <button
+                  type="button"
+                  onClick={() => onZoomModeChange('viewport')}
+                  className={`px-2.5 py-1.5 ${zoomMode === 'viewport' ? 'bg-white/25' : ''}`}
+                >
+                  整体缩放
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onZoomModeChange('copy')}
+                  className={`px-2.5 py-1.5 ${zoomMode === 'copy' ? 'bg-white/25' : ''}`}
+                >
+                  临摹缩放
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={resetZoom}
+              className="rounded-full bg-black/55 px-3 py-1.5 text-xs text-white"
+            >
+              重置缩放
+            </button>
+          </div>
         )}
 
         <canvas
@@ -615,13 +671,13 @@ const ComparisonCanvas = forwardRef<ComparisonCanvasHandle, ComparisonCanvasProp
 
         {canInteract && fullscreen && (
           <p className="pointer-events-none absolute left-3 top-12 z-10 rounded-full bg-black/45 px-2 py-1 text-[10px] text-white">
-            默认已放大 · 双指可继续缩放
+            {zoomMode === 'copy' ? '双指缩放临摹层' : '默认已放大 · 双指缩放整体'}
           </p>
         )}
 
         {canInteract && (
           <p className="pointer-events-none absolute bottom-3 left-1/2 z-10 max-w-[92%] -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-center text-xs text-white">
-            单指拖临摹 · 双指缩放整体
+            单指拖临摹 · 双指{zoomMode === 'copy' ? '缩放临摹' : '缩放整体'}
             {enableMagnifier ? ' · 悬停放大' : ''}
             {showGuides ? ' · 辅助线' : ''}
           </p>
