@@ -40,6 +40,11 @@ export default function App() {
 
   const ready = Boolean(original && copy)
 
+  const enterFullscreen = useCallback(() => {
+    setZoomMode('viewport')
+    setMobileFocus(true)
+  }, [])
+
   const currentSettings = {
     transform,
     zoomMode,
@@ -72,6 +77,7 @@ export default function App() {
 
   useEffect(() => {
     if (ready && isMobile) {
+      setZoomMode('viewport')
       setMobileFocus(true)
     }
     if (!ready) {
@@ -226,7 +232,7 @@ export default function App() {
           {ready && isMobile && (
             <button
               type="button"
-              onClick={() => setMobileFocus(true)}
+              onClick={enterFullscreen}
               className="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900"
             >
               全屏对比
@@ -276,7 +282,7 @@ export default function App() {
       {ready && isMobile && !mobileFocus && (
         <button
           type="button"
-          onClick={() => setMobileFocus(true)}
+          onClick={enterFullscreen}
           className="fixed bottom-5 right-4 z-40 rounded-full bg-amber-800 px-5 py-3 text-sm font-medium text-white shadow-lg"
         >
           全屏对比
