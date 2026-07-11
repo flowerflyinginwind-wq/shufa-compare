@@ -28,7 +28,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   opacity: 50,
   diffThreshold: 25,
   showGuides: true,
-  enablePreprocess: true,
+  enablePreprocess: false,
   diffMethod: 'structure',
   enableMagnifier: false,
 }

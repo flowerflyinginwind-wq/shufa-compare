@@ -30,7 +30,7 @@ export default function ImageEnhancePanel({
         上传后自动增强
       </label>
       <p className="text-xs text-stone-500">
-        去阴影、提升对比度、轻微去噪，减少手机拍照干扰
+        转灰度、去阴影、提升对比度，减少手机拍照干扰（画面会变为黑白）
       </p>
 
       <div className="space-y-1">
